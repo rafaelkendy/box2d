@@ -1,0 +1,61 @@
+body {
+	background-image: url("../images/woodgrain.jpg");
+	background-position: center;
+	background-repeat: no-repeat;
+}
+#wrapper {
+	width: 690px;
+	margin: 0 auto;
+}
+#myCanvas {
+	background-color:#79f1ff;
+	background-image: url("../images/tree.png");
+	background-position: contain;
+	display: inline-block;
+	position: absolute;
+}
+#debugCanvas {
+	position: absolute;
+	z-index:2;
+	cursor: none;
+}
+#frameTop, #frameBottom {
+	background-image: url("../images/frame.png");
+	width: 642px;
+	height: 46px;
+}
+#frameRight, #frameLeft {
+	background-image: url("../images/frameVertical.png");
+	width: 44px;
+	height: 600px;
+}
+#frameBottom, #frameTop, #frameLeft, #frameRight, #myCanvas {
+	background-repeat: no-repeat;
+}
+#frameLeft {
+	display: inline-block;
+	-moz-transform: scaleX(-1);
+    -o-transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1);
+    filter: FlipH;
+    -ms-filter: "FlipH";
+}
+#frameTop {
+	-moz-transform: scaleY(-1);
+    -o-transform: scaleY(-1);
+    -webkit-transform: scaleY(-1);
+    transform: scaleY(-1);
+    filter: FlipV;
+    -ms-filter: "FlipV";
+}
+#frameRight {
+	position: relative;
+	left: 550px;
+	display: inline-block;
+}
+#frameBottom {
+	position: absolute;
+	top: 596px;
+	display: block;
+}

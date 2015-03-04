@@ -1,0 +1,349 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Apple Tree</title>
+<link rel="stylesheet" href="http://meyerweb.com/eric/tools/css/reset/reset.css">
+<link rel="stylesheet" href="styles/styles.css">
+
+<script src="http://d309knd7es5f10.cloudfront.net/zim_1.3.js"></script>
+<script src="http://code.createjs.com/createjs-2014.12.12.min.js"></script>
+<script src="js/Box2dWeb-2.1.a.3.min.js"></script>
+<script src="js/phys.js"></script><!-- helper code for box2D - assumes  Box2 vars below -->
+
+<script>
+	
+	// global Box2D shortcuts to classes
+	var b2Vec2 			   = Box2D.Common.Math.b2Vec2;	
+	var b2BodyDef 		   = Box2D.Dynamics.b2BodyDef;
+	var b2Body 			   = Box2D.Dynamics.b2Body;
+	var b2FixtureDef 	   = Box2D.Dynamics.b2FixtureDef;
+	var b2Fixture 		   = Box2D.Dynamics.b2Fixture;
+	var b2World 		   = Box2D.Dynamics.b2World;
+	var b2ContactListener  = Box2D.Dynamics.b2ContactListener;
+	var b2DebugDraw 	   = Box2D.Dynamics.b2DebugDraw;
+	var b2Contact    	   = Box2D.Dynamics.Contacts.b2Contact;
+	var b2MouseJointDef    = Box2D.Dynamics.Joints.b2MouseJointDef;
+	var b2DistanceJointDef = Box2D.Dynamics.Joints.b2DistanceJointDef;
+	var b2AABB 			   = Box2D.Collision.b2AABB;
+	var b2PolygonShape 	   = Box2D.Collision.Shapes.b2PolygonShape;
+	var b2CircleShape 	   = Box2D.Collision.Shapes.b2CircleShape;
+	
+	window.addEventListener("load", init);
+	
+	function init() {
+		
+		var canvas = zid('debugCanvas');
+		var stageW = canvas.width;
+		var stageH = canvas.height;
+		
+		var stage = new createjs.Stage("myCanvas"); 
+		stage.setBounds(0, 0, stageW, stageH);
+		stage.enableMouseOver(10); // if you need mouse rollover
+		createjs.Touch.enable(stage,true); // added for mobile	
+
+		var stageCanvas = zid('myCanvas');
+
+		var manifest = [
+			{src:"images/apple.png", id:"apple"},
+			{src:"images/grass.png", id:"grass"},
+			{src:"images/leaves.png", id:"leaves"},
+			{src:"images/basket.png", id:"basket"},
+			{src:"images/frontBasket.png", id:"frontBasket"}
+		]; // array of objects
+		var preload = new createjs.LoadQueue(false); // use true if on the same server	
+		preload.on("complete", loaded);	 // call the main code when ready	
+		preload.loadManifest(manifest);
+
+		function loaded () {
+		
+			// Box2D works in something silly like Meters
+			// so we have to scale everything down to get to pixels
+			var SCALE = 30, STEP = 20, TIMESTEP = 1/STEP;
+			
+			var world = new b2World(new b2Vec2(0,10), true); // gravity, allow sleep
+			var debug = new phys.Debug(canvas, world, SCALE);
+			
+			var rect = {x:0, y:0, width:stageW, height:stageH};
+			phys.borders(rect, world, SCALE); // puts borders around canvas
+			
+			var appleW = 20 / SCALE;
+			var appleH = 20 / SCALE;
+			var barW = stageW / SCALE;
+			var barH = 10  / SCALE;
+
+			var basketSize = 30 / SCALE;
+			var basketBorder = 3 / SCALE;
+			
+			var barBodyDef = new b2BodyDef();
+			barBodyDef.type = b2Body.b2_staticBody;
+			barBodyDef.position.Set(stageW/2/SCALE, stageH/SCALE);
+			var barBody = world.CreateBody(barBodyDef);
+			barBody.SetUserData("ground");
+			var barBox = new b2PolygonShape();
+			barBox.SetAsBox(barW/2, barH/2);
+			var barFixtureDef = new b2FixtureDef();
+			barFixtureDef.shape = barBox;
+			barFixtureDef.density = 0;
+			barFixtureDef.friction = 1;
+			barFixtureDef.restitution = .3;
+			barBody.CreateFixture(barFixtureDef);
+						
+			var appleBodyDef = new b2BodyDef();
+			appleBodyDef.type = b2Body.b2_dynamicBody;
+			appleBodyDef.position.Set(200/SCALE, 40/SCALE);
+			var appleBody;
+			var dynamicapple = new b2CircleShape();
+			dynamicapple.SetRadius(appleW/2);
+			var appleFixtureDef = new b2FixtureDef();
+			appleFixtureDef.shape = dynamicapple;
+			appleFixtureDef.density = 1;
+			appleFixtureDef.friction = 1;
+			appleFixtureDef.restitution = .1;
+
+			var basketRequest = new b2BodyDef();
+			basketRequest.type = b2Body.b2_dynamicBody;
+			basketRequest.bullet = true;
+			basketRequest.position.Set(stageW/2/SCALE, stageH/2/SCALE);
+			var basket = world.CreateBody(basketRequest);
+			basket.SetSleepingAllowed(false);
+			basket.SetUserData("basket");
+
+			var basketLeft = new b2PolygonShape();
+			basketLeft.SetAsOrientedBox(basketSize-7/SCALE, basketBorder, new b2Vec2(-basketSize/2-basketSize+7/SCALE, basketSize/2), 70*Math.PI/180);
+
+			var basketDef = new b2FixtureDef();
+			basketDef.shape = basketLeft;
+			basketDef.density = 1;
+			basketDef.friction = 1;
+			//basketLeftDef.restitution = .1;
+			basket.CreateFixture(basketDef);
+
+			var basketRight = new b2PolygonShape();
+			basketRight.SetAsOrientedBox(basketSize-7/SCALE, basketBorder, new b2Vec2(basketSize/2+basketSize-7/SCALE, basketSize/2), 110*Math.PI/180);
+
+			basketDef.shape = basketRight;
+			basket.CreateFixture(basketDef);
+
+			var basketBottom = new b2PolygonShape();
+			basketBottom.SetAsOrientedBox(basketSize, basketBorder, new b2Vec2(basketSize/2-basketSize/2, basketSize/2+basketSize/2+5/SCALE), 0);
+
+			basketDef.shape = basketBottom;
+			basket.CreateFixture(basketDef);
+
+			var mouseList = [basket];
+
+			var drag = new phys.Drag(stageCanvas, world, SCALE, mouseList, true);
+
+			var contactList = basket.GetContactList();
+			var contact = contactList;
+			var contactListener = new b2ContactListener();
+
+			var applesCollected = [];
+
+			contactListener.BeginContact = function (contact) {
+				var bodyA = contact.GetFixtureA().GetBody();
+				var bodyAData = bodyA.GetUserData();
+				var bodyB = contact.GetFixtureB().GetBody();
+				var bodyBData = bodyB.GetUserData();
+
+				if (bodyAData && bodyBData) {
+					if (bodyAData == "basket" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						// var index = applesCollected.indexOf(bodyB);
+						// if (index == -1) {
+						// 	applesCollected.push(bodyB);
+						// }
+						bodyB.SetSleepingAllowed(false);
+					}
+					if (bodyAData == "ground" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						bodyB.SetSleepingAllowed(true);
+					}
+					if (bodyAData.match(/[^\d]{5}/) == "apple" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						if (!bodyA.IsSleepingAllowed()) {
+							bodyB.SetSleepingAllowed(false);
+						}
+					}
+				}
+			};
+
+			contactListener.EndContact = function (contact) {
+				var bodyA = contact.GetFixtureA().GetBody();
+				var bodyAData = bodyA.GetUserData();
+				var bodyB = contact.GetFixtureB().GetBody();
+				var bodyBData = bodyB.GetUserData();
+
+				if (bodyAData && bodyBData) {
+					if (bodyAData == "basket" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						// var index = applesCollected.indexOf(bodyB);
+						// if (index > -1) {
+						// 	applesCollected.splice(index, 1);
+						// }
+						bodyB.SetSleepingAllowed(true);
+					}
+					if (bodyAData == "ground" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						//bodyB.SetSleepingAllowed(false);
+					}
+					if (bodyAData.match(/[^\d]{5}/) == "apple" && bodyBData.match(/[^\d]{5}/) == "apple") {
+						bodyB.SetSleepingAllowed(true);
+					}
+				}
+			};
+
+			world.SetContactListener(contactListener);
+			
+			// CREATEJS
+			
+			// MapManager records all the mappings between Box2D and CreateJS
+			// we will add a Map object for each object in the world
+			var mapManager = new phys.MapManager();
+			
+			// bring the size back to normal for CreateJS
+			appleW = appleW*SCALE;
+			appleH = appleH*SCALE;
+			barW = barW*SCALE;
+			barH = barH*SCALE;
+			
+			var bar = new createjs.Shape();
+			bar.graphics.f("grey").r(0,0,barW,barH);
+			bar.regX = barW/2;
+			bar.regY = barH/2;	
+			stage.addChild(bar);
+			mapManager.add(new phys.Map(barBody, bar, "bar", SCALE));
+
+			var basketImg = new createjs.Bitmap(preload.getResult("basket"));
+			basketImg.regX = 50;
+			basketImg.regY = 90;
+			stage.addChild(basketImg);
+			mapManager.add(new phys.Map(basket, basketImg, "basket", SCALE));
+
+			var appleContainer = new createjs.Container();
+			stage.addChild(appleContainer);
+
+			var frontBasketImg = new createjs.Bitmap(preload.getResult("frontBasket"));
+			frontBasketImg.regX = 50;
+			frontBasketImg.regY = 90;
+			stage.addChild(frontBasketImg);
+			mapManager.add(new phys.Map(basket, frontBasketImg, "frontBasket", SCALE));
+
+			var leaves = new createjs.Bitmap(preload.getResult("leaves"));
+			stage.addChild(leaves);
+
+			var grass = new createjs.Bitmap(preload.getResult("grass"));
+			grass.y = stageH - 100;
+			stage.addChild(grass);
+
+			var timerTxt = new createjs.Text("0", "Bold 20px Arial", "#ff7700");
+			timerTxt.x = 20;
+			timerTxt.y = 20;
+			timerTxt.textAlign = "center";
+			timerTxt.textBaseline = "middle";
+			//stage.addChild(timerTxt);
+
+			var applesTxt = new createjs.Text("0", "Bold 20px Arial", "#ff0000");
+			applesTxt.x = 50;
+			applesTxt.y = 20;
+			applesTxt.textAlign = "center";
+			applesTxt.textBaseline = "middle";
+			//stage.addChild(applesTxt);
+			
+			var apple;
+			var apples = [];
+			var nApple = 0;
+			var timer = 600;
+			var timeUp = false;
+			var stopUpdate = false;
+			var appleInterval = 70;
+			var applesAwake = 0;
+			var nextApple = zim.rand(timer-appleInterval, timer);
+
+			function createApple() {
+				apple = new createjs.Bitmap(preload.getResult("apple"));
+				apple.regX = 15;
+				apple.regY = 15;
+				appleBodyDef.position.Set(Math.random() * stageW/SCALE, 0);
+				//appleBodyDef.position.Set(0, 0);
+				appleBodyDef.angle = zim.rand(0,180)*Math.PI/180;
+				appleBody = world.CreateBody(appleBodyDef);
+				appleBody.SetSleepingAllowed(true);
+				appleBody.SetUserData("apple" + nApple);
+				appleBody.CreateFixture(appleFixtureDef);
+				apples.push([appleBody, apple]);
+				appleContainer.addChild(apple);
+				nApple++;
+				mapManager.add(new phys.Map(appleBody, apple, "apple"+nApple, SCALE));
+			}
+
+			// update world
+			function update() {
+
+				if (!basket.IsAwake()) {
+					console.log(apples);
+					//stopUpdate = true;
+				}
+
+				if (Math.round(timer/60) > 0) {
+		   			timer--;
+			   		if (timer <= nextApple) {
+			   			createApple();
+			   			nextApple = zim.rand(timer-appleInterval, timer);
+			   		}
+
+					timerTxt.text = Math.round(timer/60);
+
+					drag.update();
+
+				}
+
+				if (Math.round(timer/60) <= 0 && !timeUp) {
+					timeUp = true;
+					//setTimeout(checkApples, 2000);
+					//basket.SetSleepingAllowed(true);
+				}
+
+				//applesTxt.text = applesCollected.length;
+
+				if (!stopUpdate) {
+					requestAnimationFrame(update);
+					world.Step(TIMESTEP, 10, 10);	
+					world.ClearForces();
+					mapManager.update();
+					stage.update();
+					//debug.update();
+
+					applesAwake = 0;
+					for (var i = 0; i < apples.length; i++) {
+						var linearVel = apples[i][0].GetLinearVelocity();
+						if (apples[i][0].IsSleepingAllowed() && (!apples[i][0].IsAwake() || (linearVel.x < 1 && linearVel.y == 0))) {
+			   				world.DestroyBody(apples[i][0]);
+			   				appleContainer.removeChild(apples[i][1]);
+			   				apples.splice(i, 1);
+			   			} else if (apples[i][0].IsSleepingAllowed() && apples[i][0].IsAwake()) {
+			   				applesAwake++;
+			   			}
+
+			   		}
+
+			   		/*if (timeUp && applesAwake == 0) {
+			   			console.log(apples);
+						stopUpdate = true;
+			   		}*/
+			   	}
+
+			}
+			update();
+		}
+	}
+
+</script>
+</head>
+
+<body>
+
+	<div id="wrapper">
+		<div id="frameTop"></div>
+		<div id="frameLeft"></div><canvas id="debugCanvas" width="550" height="550"></canvas><canvas id="myCanvas" width="550" height="550"></canvas><div id="frameRight"></div>
+		<div id="frameBottom"></div>
+	</div>
+
+</body>
+</html>
